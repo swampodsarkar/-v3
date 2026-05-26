@@ -113,6 +113,35 @@ async function handleAdminCallback(ctx) {
     await handleAdminCallback(ctx);
   }
 
+  else if (data === 'admin_create_code') {
+    await ctx.reply('🔑 Enter: CODE REWARD [maxUses]\nExample: WELCOME100 100 50\n(CODE = uppercase, REWARD = coins, maxUses = optional, 0 = unlimited)');
+    ctx.session = ctx.session || {};
+    ctx.session.awaitingCodeCreate = true;
+  }
+
+  else if (data === 'admin_list_codes') {
+    const { getAllCodes } = require('../database/services/hiddenCodeService');
+    const codes = await getAllCodes();
+    const entries = Object.entries(codes);
+    if (!entries.length) return ctx.editMessageText('No codes yet.', { parse_mode: 'HTML', ...adminKeyboard });
+    let text = '🔑 <b>Hidden Codes</b>\n\n';
+    const buttons = [];
+    entries.slice(0, 10).forEach(([code, data]) => {
+      text += `<code>${code}</code> | +${data.reward} coins | Uses: ${data.uses}/${data.maxUses || '∞'} | ${data.active ? '✅' : '❌'}\n`;
+      buttons.push([Markup.button.callback(`${data.active ? '🔄 Deactivate' : '🔄 Activate'} ${code}`, `admin_toggle_code_${code}`)]);
+    });
+    buttons.push([Markup.button.callback('🔙 Back', 'admin_back')]);
+    await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: Markup.inlineKeyboard(buttons).reply_markup });
+  }
+
+  else if (data.startsWith('admin_toggle_code_')) {
+    const code = data.replace('admin_toggle_code_', '');
+    const { toggleCode } = require('../database/services/hiddenCodeService');
+    await toggleCode(code);
+    ctx.callbackQuery.data = 'admin_list_codes';
+    await handleAdminCallback(ctx);
+  }
+
   await ctx.answerCbQuery().catch(() => {});
 }
 

@@ -432,6 +432,11 @@ async function handleCallbackQuery(ctx) {
       ctx.session.awaitingVerificationCode = true;
       await ctx.reply('🔑 আপনার Verification Code টি এখন টাইপ করে পাঠান:');
     }
+    else if (data === 'enter_hidden_code') {
+      ctx.session = ctx.session || {};
+      ctx.session.awaitingHiddenCode = true;
+      await ctx.reply('🔑 হিডেন কোড টি টাইপ করে পাঠান:\n\nযেমন: WELCOME100\n\n(কোড বড় হাতের অক্ষরে হবে)');
+    }
 
     await ctx.answerCbQuery().catch(() => {});
   } catch (err) {

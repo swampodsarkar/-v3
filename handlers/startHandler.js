@@ -68,17 +68,25 @@ async function handleStart(ctx) {
     }
   }
 
+  let noticeText = '';
+  try {
+    const { getDB } = require('../database/firebase');
+    const snap = await getDB().ref('notice').once('value');
+    const notice = snap.val();
+    if (notice) noticeText = `📢 <b>Notice:</b>\n${notice}\n\n`;
+  } catch(e) {}
+
   const balance = await getBalance(userId);
   const refLink = generateReferralLink(userId);
 
-  const welcomeText = isNewUser
+  const welcomeText = noticeText + (isNewUser
     ? `🎉 <b>Welcome to Classic Earning Bot!</b>\n\n` +
       `Earn coins daily, spin the wheel, watch ads, complete tasks and withdraw real rewards!\n\n` +
       `💰 Your Balance: <b>${balance.coins}</b> coins\n` +
       `👥 Referral Link: <code>${refLink}</code>`
     : `🏠 <b>Welcome back, ${firstName}!</b>\n\n` +
       `💰 Balance: <b>${balance.coins}</b> coins\n` +
-      `Use the menu below to start earning.`;
+      `Use the menu below to start earning.`);
 
   await ctx.replyWithHTML(welcomeText, mainMenuKeyboard);
 }

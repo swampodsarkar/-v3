@@ -46,6 +46,9 @@ const earnMenuKeyboard = Markup.inlineKeyboard([
     Markup.button.callback('⛏️ Mining', 'mining_menu'),
     Markup.button.callback('📋 Tasks', 'tasks_menu'),
   ],
+  [
+    Markup.button.callback('🔑 Enter Code', 'enter_hidden_code'),
+  ],
   [Markup.button.callback('🔙 Back to Home', 'main_menu')],
 ]);
 
@@ -73,6 +76,10 @@ const adminKeyboard = Markup.inlineKeyboard([
   [
     Markup.button.callback('💸 Withdraw Requests', 'admin_withdraws'),
     Markup.button.callback('👥 All Users', 'admin_users'),
+  ],
+  [
+    Markup.button.callback('🔑 Create Code', 'admin_create_code'),
+    Markup.button.callback('📋 All Codes', 'admin_list_codes'),
   ],
   [Markup.button.callback('❌ Close', 'admin_close')],
 ]);

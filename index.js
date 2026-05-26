@@ -172,6 +172,17 @@ bot.on('text', async (ctx) => {
     return;
   }
 
+  if (sessionData.awaitingCodeCreate) {
+    ctx.session.awaitingCodeCreate = false;
+    if (!require('./admin/adminHandler').isAdmin(ctx.from.id)) return;
+    const parts = text.split(' ');
+    const [code, reward, maxUses] = parts;
+    if (!code || !reward) return ctx.reply('❌ Format: CODE REWARD [maxUses]');
+    const { createCode } = require('./database/services/hiddenCodeService');
+    const result = await createCode(code.toUpperCase(), parseInt(reward), parseInt(maxUses) || 0);
+    return ctx.reply(result.success ? `✅ Code ${code.toUpperCase()} created! +${reward} coins` : `❌ ${result.message}`);
+  }
+
   if (sessionData.awaitingCoinAction) {
     const action = sessionData.awaitingCoinAction;
     ctx.session.awaitingCoinAction = false;
@@ -252,6 +263,17 @@ bot.on('text', async (ctx) => {
       `📊 বাকি: <b>${remaining}/${MAX_AD_WATCHES}</b> টি অ্যাড\n\n` +
       `আবার অ্যাড দেখতে চাইলে মেনু থেকে আসুন।`
     );
+  }
+
+  // Hidden code entry
+  if (sessionData.awaitingHiddenCode) {
+    ctx.session.awaitingHiddenCode = false;
+    const { claimCode } = require('./database/services/hiddenCodeService');
+    const result = await claimCode(ctx.from.id, text);
+    if (result.success) {
+      return ctx.replyWithHTML(`✅ <b>Code Redeemed!</b>\n\n+${result.reward} coins যোগ হয়েছে আপনার অ্যাকাউন্টে।`);
+    }
+    return ctx.reply(result.message);
   }
 
   const { showMainMenu } = require('./handlers/menuHandler');

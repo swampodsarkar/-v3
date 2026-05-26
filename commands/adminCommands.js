@@ -60,6 +60,35 @@ async function registerAdminCommands(bot) {
     ctx.callbackQuery = { data: 'admin_withdraws' };
     await handleAdminCallback(ctx);
   });
+
+  bot.command('notice', async (ctx) => {
+    const { isAdmin } = require('../admin/adminHandler');
+    if (!isAdmin(ctx.from.id)) return;
+    const msg = ctx.message.text.split(' ').slice(1).join(' ').trim();
+    if (!msg) return ctx.reply('Usage: /notice <message>');
+    const { getDB } = require('../database/firebase');
+    await getDB().ref('notice').set(msg);
+    await ctx.reply('✅ Notice updated!');
+  });
+
+  bot.command('removenotice', async (ctx) => {
+    const { isAdmin } = require('../admin/adminHandler');
+    if (!isAdmin(ctx.from.id)) return;
+    const { getDB } = require('../database/firebase');
+    await getDB().ref('notice').set('');
+    await ctx.reply('✅ Notice removed!');
+  });
+
+  bot.command('code', async (ctx) => {
+    const code = ctx.message.text.split(' ').slice(1).join(' ').trim().toUpperCase();
+    if (!code) return ctx.reply('Usage: /code CODE_NAME');
+    const { claimCode } = require('../database/services/hiddenCodeService');
+    const result = await claimCode(ctx.from.id, code);
+    if (result.success) {
+      return ctx.replyWithHTML(`✅ <b>Code Redeemed!</b>\n\n+${result.reward} coins যোগ হয়েছে।`);
+    }
+    return ctx.reply(result.message);
+  });
 }
 
 module.exports = { registerAdminCommands };
