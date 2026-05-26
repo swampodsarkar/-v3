@@ -3,37 +3,43 @@ const { Markup } = require('telegraf');
 const mainMenuKeyboard = Markup.inlineKeyboard([
   [
     Markup.button.callback('💰 Earn Coins', 'earn_menu'),
+    Markup.button.callback('💧 Faucet', 'faucet_claim'),
+  ],
+  [
     Markup.button.callback('🎁 Daily Bonus', 'daily_bonus'),
-  ],
-  [
     Markup.button.callback('🎡 Spin Wheel', 'spin_wheel'),
+  ],
+  [
     Markup.button.callback('📺 Watch Ads', 'watch_ads'),
-  ],
-  [
     Markup.button.callback('📋 Tasks', 'tasks_menu'),
+  ],
+  [
     Markup.button.callback('👥 Refer & Earn', 'referral_menu'),
-  ],
-  [
     Markup.button.callback('👛 Wallet', 'wallet_menu'),
+  ],
+  [
     Markup.button.callback('💸 Withdraw', 'withdraw_menu'),
-  ],
-  [
     Markup.button.callback('🏆 Leaderboard', 'leaderboard'),
-    Markup.button.callback('💎 VIP Membership', 'vip_menu'),
   ],
   [
+    Markup.button.callback('💎 VIP Membership', 'vip_menu'),
     Markup.button.callback('⚙️ Settings', 'settings_menu'),
+  ],
+  [
     Markup.button.callback('📞 Support', 'support'),
   ],
 ]);
 
 const earnMenuKeyboard = Markup.inlineKeyboard([
   [
+    Markup.button.callback('💧 Faucet', 'faucet_claim'),
     Markup.button.callback('🎁 Daily Bonus', 'daily_bonus'),
-    Markup.button.callback('🎡 Spin Wheel', 'spin_wheel'),
   ],
   [
+    Markup.button.callback('🎡 Spin Wheel', 'spin_wheel'),
     Markup.button.callback('📺 Watch Ads', 'watch_ads'),
+  ],
+  [
     Markup.button.callback('📋 Tasks', 'tasks_menu'),
   ],
   [Markup.button.callback('🔙 Back to Home', 'main_menu')],

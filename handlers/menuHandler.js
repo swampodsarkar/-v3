@@ -315,6 +315,26 @@ async function handleSupport(ctx) {
   await ctx.editMessageText(text, { parse_mode: 'HTML', ...backKeyboard });
 }
 
+async function handleFaucet(ctx) {
+  const userId = ctx.from.id;
+  const { claimFaucet, canClaim, FAUCET_COOLDOWN } = require('../database/services/faucetService');
+  const check = await canClaim(userId);
+  if (!check.can) {
+    const mins = Math.ceil(check.remaining / 60000);
+    return ctx.answerCbQuery(`⏳ Wait ${mins} min`, { show_alert: true });
+  }
+  const result = await claimFaucet(userId);
+  if (result.success) {
+    await ctx.answerCbQuery(`💧 +${result.amount} coins claimed!`, { show_alert: true });
+    const { getBalance } = require('../database/services/balanceService');
+    const bal = await getBalance(userId);
+    await ctx.editMessageText(
+      `💧 <b>Faucet</b>\n\n✅ +${result.amount} coins!\n💰 Balance: <b>${bal.coins}</b> coins\n\nআবার ${Math.ceil(FAUCET_COOLDOWN / 60000)} মিনিট পর নিন।`,
+      { parse_mode: 'HTML', ...backKeyboard }
+    );
+  }
+}
+
 // Main callback query router
 async function handleCallbackQuery(ctx) {
   const data = ctx.callbackQuery.data;
@@ -343,6 +363,7 @@ async function handleCallbackQuery(ctx) {
     else if (data === 'vip_benefits') await handleVIPMenu(ctx);
     else if (data === 'settings_menu') await handleSettings(ctx);
     else if (data === 'support') await handleSupport(ctx);
+    else if (data === 'faucet_claim') await handleFaucet(ctx);
     else if (data === 'verify_channel') await require('./startHandler').handleVerifyChannel(ctx);
     else if (data === 'share_referral') {
       const link = generateReferralLink(ctx.from.id);
