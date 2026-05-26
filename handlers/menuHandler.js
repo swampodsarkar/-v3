@@ -437,6 +437,11 @@ async function handleCallbackQuery(ctx) {
       ctx.session.awaitingHiddenCode = true;
       await ctx.reply('🔑 হিডেন কোড টি টাইপ করে পাঠান:\n\nযেমন: WELCOME100\n\n(কোড বড় হাতের অক্ষরে হবে)');
     }
+    else if (data.startsWith('admin_') || data.startsWith('approve_wd_') || data.startsWith('reject_wd_')) {
+      const { handleAdminCallback } = require('../admin/adminHandler');
+      await handleAdminCallback(ctx);
+      return;
+    }
 
     await ctx.answerCbQuery().catch(() => {});
   } catch (err) {
