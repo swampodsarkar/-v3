@@ -103,6 +103,7 @@ async function handleWatchAds(ctx) {
   const { getAdWatchCount } = require('../database/services/userService');
   const count = await getAdWatchCount(userId);
   const remaining = Math.max(0, 10 - count);
+  const watchUrl = `${process.env.WEBHOOK_URL || 'https://your-domain.com'}/watch-ad/${userId}`;
 
   if (remaining <= 0) {
     return ctx.editMessageText(
@@ -120,41 +121,24 @@ async function handleWatchAds(ctx) {
     );
   }
 
-  const { Markup } = require('telegraf');
-
   await ctx.editMessageText(
     `📺 <b>Watch Ad & Earn</b>\n\n` +
     `📊 বাকি: <b>${remaining}/১০</b> টি অ্যাড\n\n` +
-    `নিচের লিংকে ক্লিক করে অ্যাড দেখুন।\n` +
-    `৩০ সেকেন্ড পর অটোমেটিক আপনার কোড আসবে।\n\n` +
+    `"Open Ad" এ ক্লিক করে অ্যাড দেখুন।\n` +
+    `৩০ সেকেন্ড পর নতুন ট্যাবে আপনার কোড আসবে।\n` +
+    `কোড কপি করে "Enter Code" এ পেস্ট করুন।\n\n` +
     `⚠️ অ্যাড না দেখলে কয়েন পাবেন না।`,
     {
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [
-          [{ text: "▶️ Open Ad", url: "https://omg10.com/4/11060583" }],
+          [{ text: "▶️ Open Ad", url: watchUrl }],
           [{ text: "✏️ Enter Verification Code", callback_data: "enter_verification_code" }],
           [{ text: "🔙 Back", callback_data: "earn_menu" }]
         ]
       }
     }
   );
-
-  // Auto-generate code after 30 seconds (bot-based, no web page needed)
-  setTimeout(async () => {
-    try {
-      const { createVerification } = require('../utils/verification');
-      const code = createVerification(userId);
-
-      await ctx.replyWithHTML(
-        `✅ <b>Verification Code</b>\n\n` +
-        `আপনার কোড: <code>${code}</code>\n\n` +
-        `কোডটি কপি করে নিচে পাঠান।`
-      );
-    } catch (err) {
-      console.error('Auto-code error:', err);
-    }
-  }, 30000);
 }
 
 async function handleTasksMenu(ctx) {

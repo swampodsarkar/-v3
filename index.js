@@ -21,6 +21,86 @@ bot.use(session());
 // ==================== VERIFICATION CODE SYSTEM (Anti-Cheat) ====================
 const { pendingVerifications, MAX_AD_WATCHES, createVerification, getVerification, deleteVerification } = require('./utils/verification');
 
+// Ad page: shows Monetag link, after 30s auto-redirects to code page
+app.get('/watch-ad/:userId', async (req, res) => {
+  const userId = req.params.userId;
+  const { getAdWatchCount } = require('./database/services/userService');
+  const count = await getAdWatchCount(userId);
+  const remaining = Math.max(0, MAX_AD_WATCHES - count);
+
+  if (remaining <= 0) {
+    return res.send(`<html><body style="text-align:center;padding:50px;font-family:Arial"><h2>❌ Limit Reached</h2><p>You have used all ${MAX_AD_WATCHES} watches.</p><a href="https://t.me/${config.botUsername.replace('@', '')}">Back to Bot</a></body></html>`);
+  }
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Watch Ad</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta http-equiv="refresh" content="30;url=/verify-tab/${userId}">
+      <style>
+        body{font-family:Arial,sans-serif;text-align:center;padding:40px 20px;background:#f4f4f4}
+        .container{max-width:400px;margin:0 auto;background:white;padding:30px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+        .btn{display:inline-block;background:#0088cc;color:white;padding:15px 30px;font-size:18px;border-radius:8px;text-decoration:none;margin-top:15px}
+        .btn:hover{background:#006699}
+        .warning{color:#d32f2f;font-size:14px;margin-top:15px}
+        .remaining{color:#666;font-size:14px}
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h2>📺 Watch Ad</h2>
+        <p class="remaining">বাকি: <b>${remaining}/${MAX_AD_WATCHES}</b></p>
+        <p>নিচের লিংকে ক্লিক করে অ্যাড দেখুন।<br>৩০ সেকেন্ড পর অটো কোড পেজে যাবে।</p>
+        <a class="btn" href="https://omg10.com/4/11060583" target="_blank">▶️ Open Ad</a>
+        <p style="margin-top:20px;color:#666">⏳ ৩০ সেকেন্ড পর অটো রিডিরেক্ট...</p>
+        <p class="warning">⚠️ মিথ্যা ক্লিক করলে কয়েন পাবেন না।</p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+// Code page: shows verification code (auto-generated on load)
+app.get('/verify-tab/:userId', async (req, res) => {
+  const userId = req.params.userId;
+  const { getAdWatchCount } = require('./database/services/userService');
+  const count = await getAdWatchCount(userId);
+  const remaining = Math.max(0, MAX_AD_WATCHES - count);
+
+  if (remaining <= 0) {
+    return res.send(`<html><body style="text-align:center;padding:50px;font-family:Arial"><h2>❌ Limit Reached</h2><a href="https://t.me/${config.botUsername.replace('@', '')}">Back to Bot</a></body></html>`);
+  }
+
+  const code = createVerification(userId);
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Verification Code</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        body{font-family:Arial,sans-serif;text-align:center;padding:30px 20px;background:#f4f4f4}
+        .container{max-width:400px;margin:0 auto;background:white;padding:25px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+        .code{font-size:28px;font-weight:bold;color:#0088cc;letter-spacing:3px;margin:15px 0;padding:10px;background:#f0f8ff;border-radius:8px}
+        .btn{display:inline-block;background:#0088cc;color:white;padding:12px 25px;font-size:16px;border-radius:8px;text-decoration:none;margin-top:10px}
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h3>✅ আপনার Verification Code</h3>
+        <div class="code" id="codeDisplay">${code}</div>
+        <p>কোডটি কপি করে বটে পাঠান 🎯</p>
+        <button class="btn" onclick="navigator.clipboard.writeText('${code}').then(()=>alert('✅ Copied!')).catch(()=>prompt('Copy:', '${code}'))">📋 Copy Code</button>
+        <p style="margin-top:10px"><a class="btn" href="https://t.me/${config.botUsername.replace('@', '')}">Back to Bot</a></p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 // ==================== END VERIFICATION SYSTEM ====================
 
 // Security middleware
@@ -119,7 +199,7 @@ bot.on('text', async (ctx) => {
     const verification = getVerification(userId);
 
     if (!verification) {
-      return ctx.reply('❌ কোনো Verification Code পাওয়া যায়নি। আবার "Get Verification Code" চাপুন।');
+      return ctx.reply('❌ কোনো Verification Code পাওয়া যায়নি। "Open Ad" এ ক্লিক করে নতুন করে কোড নিন।');
     }
 
     if (verification.used) {
