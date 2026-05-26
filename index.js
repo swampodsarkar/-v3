@@ -26,7 +26,7 @@ function generateVerificationCode() {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
 
-// Ad Watch Page - opens ad in new tab, shows code on same page after 30s
+// Ad Watch Page - opens ad, after 30s auto-redirects to verification page
 app.get('/watch-ad/:userId', async (req, res) => {
   const userId = req.params.userId;
   const { getAdWatchCount } = require('./database/services/userService');
@@ -69,9 +69,7 @@ app.get('/watch-ad/:userId', async (req, res) => {
         .btn:hover { background: #006699; }
         .btn:disabled { background: #ccc; cursor: not-allowed; }
         .timer { font-size: 48px; font-weight: bold; color: #0088cc; margin: 20px 0; }
-        .code { font-size: 28px; font-weight: bold; color: #0088cc; letter-spacing: 3px; margin: 15px 0; padding: 10px; background: #f0f8ff; border-radius: 8px; }
         .warning { color: #d32f2f; font-size: 14px; margin-top: 15px; }
-        .hidden { display: none; }
         .remaining { color: #666; font-size: 14px; }
       </style>
     </head>
@@ -79,7 +77,7 @@ app.get('/watch-ad/:userId', async (req, res) => {
       <div class="container">
         <h2>📺 Watch Ad & Earn</h2>
         <p class="remaining">বাকি: <b>${remaining}/${MAX_AD_WATCHES}</b></p>
-        <p>নিচের বাটনে ক্লিক করলে অ্যাড ওপেন হবে। <b>৩০ সেকেন্ড</b> পর এই পেজেই কোড দেখাবে।</p>
+        <p>নিচের বাটনে ক্লিক করলে অ্যাড ওপেন হবে। <b>৩০ সেকেন্ড</b> পর অটো ভেরিফিকেশন পেজে চলে যাবে।</p>
 
         <div id="step1">
           <button class="btn" id="watchBtn" onclick="startAd()">▶️ Watch Ad Now</button>
@@ -88,33 +86,24 @@ app.get('/watch-ad/:userId', async (req, res) => {
 
         <div id="timerArea" class="hidden">
           <div class="timer" id="timerDisplay">30</div>
-          <p>অপেক্ষা করুন <span id="secDisplay">30</span> সেকেন্ড</p>
-        </div>
-
-        <div id="codeArea" class="hidden">
-          <p>✅ আপনার Verification Code:</p>
-          <div class="code" id="codeDisplay">------</div>
-          <p>কোডটি কপি করে বটে পাঠান 🎯</p>
-          <button class="btn" onclick="copyCode()">📋 Copy Code</button>
-          <p style="margin-top:10px"><a class="btn" href="https://t.me/${config.botUsername.replace('@', '')}">Back to Bot</a></p>
+          <p>অপেক্ষা করুন <span id="secDisplay">30</span> সেকেন্ড...</p>
+          <p id="redirectMsg" class="hidden" style="color:#2e7d32;font-weight:bold">⏳ রিডিরেক্ট হচ্ছে...</p>
         </div>
 
         <p class="warning">⚠️ মিথ্যা ক্লিক করলে কয়েন পাবেন না এবং অ্যাকাউন্ট সাসপেন্ড হতে পারে।</p>
       </div>
 
       <script>
-        let timer = 30;
-        let codeGenerated = false;
-
         function startAd() {
           document.getElementById('watchBtn').disabled = true;
-          document.getElementById('watchBtn').textContent = '⏳ Opening...';
+          document.getElementById('watchBtn').textContent = '✅ Started';
           document.getElementById('statusText').textContent = 'অ্যাড ওপেন হচ্ছে...';
           document.getElementById('step1').classList.add('hidden');
           document.getElementById('timerArea').classList.remove('hidden');
 
           window.open('https://omg10.com/4/11060583', '_blank');
 
+          let timer = 30;
           const interval = setInterval(() => {
             timer--;
             document.getElementById('timerDisplay').textContent = timer;
@@ -122,32 +111,101 @@ app.get('/watch-ad/:userId', async (req, res) => {
 
             if (timer <= 0) {
               clearInterval(interval);
-              if (!codeGenerated) generateCode();
+              document.getElementById('redirectMsg').classList.remove('hidden');
+              // Redirect to verification page
+              window.location.href = '/verify-tab/${userId}';
             }
           }, 1000);
         }
+      </script>
+    </body>
+    </html>
+  `);
+});
 
-        async function generateCode() {
-          codeGenerated = true;
-          document.getElementById('timerDisplay').textContent = '⏳';
+// Verification Page - auto-generates code on load and shows it
+app.get('/verify-tab/:userId', async (req, res) => {
+  const userId = req.params.userId;
+  const { getAdWatchCount } = require('./database/services/userService');
+  const count = await getAdWatchCount(userId);
+  const remaining = Math.max(0, MAX_AD_WATCHES - count);
 
+  if (remaining <= 0) {
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Limit Reached</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px 20px; background: #f4f4f4; }
+        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+      </style>
+      </head>
+      <body>
+        <div class="container">
+          <h2>❌ Limit Reached</h2>
+          <p>আপনি সর্বোচ্চ <b>${MAX_AD_WATCHES} বার</b> অ্যাড দেখেছেন।</p>
+          <p><a href="https://t.me/${config.botUsername.replace('@', '')}">Back to Bot</a></p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Verification Code</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 30px 20px; background: #f4f4f4; }
+        .container { max-width: 400px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .code { font-size: 28px; font-weight: bold; color: #0088cc; letter-spacing: 3px; margin: 15px 0; padding: 10px; background: #f0f8ff; border-radius: 8px; }
+        .btn { display: inline-block; background: #0088cc; color: white; border: none; padding: 12px 25px; font-size: 16px; border-radius: 8px; cursor: pointer; text-decoration: none; }
+        .btn:hover { background: #006699; }
+        .hidden { display: none; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h3>✅ Verification Code</h3>
+        <div id="loadingArea">
+          <p>⏳ কোড জেনারেট হচ্ছে...</p>
+        </div>
+        <div id="codeArea" class="hidden">
+          <p>✅ আপনার Verification Code:</p>
+          <div class="code" id="codeDisplay">------</div>
+          <p>কোডটি কপি করে বটে পাঠান</p>
+          <button class="btn" onclick="copyCode()">📋 Copy Code</button>
+          <p style="margin-top:10px"><a class="btn" href="https://t.me/${config.botUsername.replace('@', '')}">Back to Bot</a></p>
+        </div>
+        <div id="errorArea" class="hidden">
+          <p id="errorMsg" style="color:#d32f2f">❌ Error</p>
+        </div>
+      </div>
+
+      <script>
+        (async function() {
           try {
             const response = await fetch('/api/generate-code/${userId}');
             const data = await response.json();
 
             if (data.success && data.code) {
-              document.getElementById('timerArea').classList.add('hidden');
+              document.getElementById('loadingArea').classList.add('hidden');
               document.getElementById('codeArea').classList.remove('hidden');
               document.getElementById('codeDisplay').textContent = data.code;
             } else {
-              document.getElementById('timerDisplay').textContent = '❌';
-              document.querySelector('#timerArea p').textContent = data.message || 'Error. Try again.';
+              document.getElementById('loadingArea').classList.add('hidden');
+              document.getElementById('errorArea').classList.remove('hidden');
+              document.getElementById('errorMsg').textContent = '❌ ' + (data.message || 'Error');
             }
           } catch (err) {
-            document.getElementById('timerDisplay').textContent = '❌';
-            document.querySelector('#timerArea p').textContent = 'Error. Try again.';
+            document.getElementById('loadingArea').classList.add('hidden');
+            document.getElementById('errorArea').classList.remove('hidden');
+            document.getElementById('errorMsg').textContent = '❌ Network error. Try again.';
           }
-        }
+        })();
 
         function copyCode() {
           const code = document.getElementById('codeDisplay').textContent;
