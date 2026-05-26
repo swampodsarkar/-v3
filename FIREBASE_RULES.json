@@ -1,0 +1,55 @@
+// Paste these rules in Firebase Console → Realtime Database → Rules tab
+
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid || root.child('admins').child(auth.uid).val() === true",
+        ".write": "$uid === auth.uid || root.child('admins').child(auth.uid).val() === true"
+      }
+    },
+
+    "balances": {
+      "$uid": {
+        ".read": "$uid === auth.uid || root.child('admins').child(auth.uid).val() === true",
+        ".write": "root.child('admins').child(auth.uid).val() === true || $uid === auth.uid"
+      }
+    },
+
+    "withdraws": {
+      ".read": "root.child('admins').child(auth.uid).val() === true",
+      ".write": "root.child('admins').child(auth.uid).val() === true"
+    },
+
+    "spins": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+
+    "dailyBonus": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+
+    "referrals": {
+      "$uid": {
+        ".read": "$uid === auth.uid || root.child('admins').child(auth.uid).val() === true",
+        ".write": "$uid === auth.uid || root.child('admins').child(auth.uid).val() === true"
+      }
+    },
+
+    "userTasks": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    }
+  }
+}

@@ -1,0 +1,370 @@
+const { Markup } = require('telegraf');
+const {
+  mainMenuKeyboard,
+  earnMenuKeyboard,
+  walletKeyboard,
+  spinKeyboard,
+  referralKeyboard,
+  withdrawKeyboard,
+  vipKeyboard,
+  tasksKeyboard,
+  backKeyboard,
+} = require('../keyboards/mainKeyboard');
+const { getBalance } = require('../database/services/balanceService');
+const { claimDailyBonus, canClaimDaily, getLastClaim } = require('../database/services/dailyBonusService');
+const { canSpin, performSpin } = require('../database/services/spinService');
+const { getReferralData, getReferralCount } = require('../database/services/referralService');
+const { createWithdrawRequest, getUserWithdraws } = require('../database/services/withdrawService');
+const { getTasks, claimTask, getCompletedTasks } = require('../database/services/taskService');
+const { generateReferralLink, formatNumber, getTimeLeft } = require('../utils/helpers');
+const config = require('../config/config');
+
+async function showMainMenu(ctx) {
+  const userId = ctx.from.id;
+  const balance = await getBalance(userId);
+  const text = `🏠 <b>Main Menu</b>\n\n💰 Balance: <b>${formatNumber(balance.coins)}</b> coins`;
+  await ctx.editMessageText(text, { parse_mode: 'HTML', ...mainMenuKeyboard }).catch(() => {
+    ctx.replyWithHTML(text, mainMenuKeyboard);
+  });
+}
+
+async function handleEarnMenu(ctx) {
+  await ctx.editMessageText('💰 <b>Earn Coins Menu</b>\n\nChoose how you want to earn today:', {
+    parse_mode: 'HTML',
+    ...earnMenuKeyboard,
+  }).catch(async () => {
+    await ctx.replyWithHTML('💰 <b>Earn Coins Menu</b>', earnMenuKeyboard);
+  });
+}
+
+async function handleDailyBonus(ctx) {
+  const userId = ctx.from.id;
+  const canClaim = await canClaimDaily(userId);
+
+  if (!canClaim) {
+    const last = await getLastClaim(userId);
+    const nextClaim = last + 24 * 60 * 60 * 1000;
+    const timeLeft = getTimeLeft(nextClaim - Date.now());
+    return ctx.answerCbQuery(`⏳ Already claimed today. Next in ${timeLeft}`, { show_alert: true });
+  }
+
+  const result = await claimDailyBonus(userId);
+  if (result.success) {
+    await ctx.answerCbQuery(`🎁 +${result.amount} coins claimed!`, { show_alert: true });
+    await showMainMenu(ctx);
+  } else {
+    await ctx.answerCbQuery(result.message, { show_alert: true });
+  }
+}
+
+async function handleSpinWheel(ctx) {
+  const userId = ctx.from.id;
+  const spinCheck = await canSpin(userId);
+
+  let text = `🎡 <b>Spin Wheel</b>\n\n`;
+
+  if (!spinCheck.can) {
+    if (spinCheck.reason === 'cooldown') {
+      text += `⏳ Cooldown: ${getTimeLeft(spinCheck.remaining)}\n`;
+    } else {
+      text += `❌ Daily spin limit reached.\n`;
+    }
+    text += `Spins left today: ${spinCheck.spinsLeft || 0}`;
+    return ctx.editMessageText(text, { parse_mode: 'HTML', ...backKeyboard });
+  }
+
+  text += `Spins left today: ${spinCheck.spinsLeft}\n\n` +
+          `Click spin to try your luck! Possible rewards: 0 - 500 coins`;
+
+  await ctx.editMessageText(text, { parse_mode: 'HTML', ...spinKeyboard });
+}
+
+async function handleSpinAction(ctx) {
+  const userId = ctx.from.id;
+  const result = await performSpin(userId);
+
+  if (!result.success) {
+    return ctx.answerCbQuery('Cannot spin now. Check cooldown or daily limit.', { show_alert: true });
+  }
+
+  const rewardText = result.reward > 0
+    ? `🎉 You won <b>${result.reward}</b> coins!`
+    : `😢 Better luck next time! (0 coins)`;
+
+  await ctx.answerCbQuery(`Spun! ${result.reward} coins`, { show_alert: true });
+
+  const newText = `🎡 <b>Spin Result</b>\n\n${rewardText}\n\nSpins left: ${result.spinsLeft}\n\nSpin again after cooldown.`;
+
+  await ctx.editMessageText(newText, { parse_mode: 'HTML', ...spinKeyboard });
+}
+
+async function handleWatchAds(ctx) {
+  const userId = ctx.from.id;
+  const { getAdWatchCount } = require('../database/services/userService');
+  const count = await getAdWatchCount(userId);
+  const remaining = Math.max(0, 10 - count);
+
+  const watchUrl = `${process.env.WEBHOOK_URL || 'https://your-domain.com'}/watch-ad/${userId}`;
+
+  if (remaining <= 0) {
+    return ctx.editMessageText(
+      `📺 <b>Watch Ads & Earn</b>\n\n` +
+      `❌ আপনি সর্বোচ্চ ১০ বার অ্যাড দেখেছেন।\n\n` +
+      `অন্য কাজ দেখে কয়েন আয় করুন।`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 Back", callback_data: "earn_menu" }]
+          ]
+        }
+      }
+    );
+  }
+
+  const text = 
+    `📺 <b>Watch Ads & Earn</b>\n\n` +
+    `📊 বাকি: <b>${remaining}/১০</b> টি অ্যাড\n\n` +
+    `1. নিচের বাটনে ক্লিক করুন\n` +
+    `2. ৩০ সেকেন্ড অপেক্ষা করুন\n` +
+    `3. অটোমেটিক কোড জেনারেট হবে\n` +
+    `4. কোড কপি করে বটে পাঠান\n\n` +
+    `⚠️ অ্যাড না দেখলে কয়েন পাবেন না।`;
+
+  await ctx.editMessageText(text, {
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "▶️ Watch Ad & Get Code", url: watchUrl }],
+        [{ text: "✏️ Enter Verification Code", callback_data: "enter_verification_code" }],
+        [{ text: "🔙 Back", callback_data: "earn_menu" }]
+      ]
+    }
+  });
+}
+
+async function handleTasksMenu(ctx) {
+  await ctx.editMessageText('📋 <b>Available Tasks</b>\n\nComplete tasks and earn extra coins!', {
+    parse_mode: 'HTML',
+    ...tasksKeyboard,
+  });
+}
+
+async function handleListTasks(ctx) {
+  const userId = ctx.from.id;
+  const tasks = await getTasks();
+  const completed = await getCompletedTasks(userId);
+
+  let text = '📋 <b>Tasks</b>\n\n';
+  const buttons = [];
+
+  tasks.forEach(task => {
+    const done = completed[task.id];
+    text += `${done ? '✅' : '⬜'} <b>${task.title}</b> (+${task.reward})\n${task.description}\n\n`;
+    if (!done) {
+      buttons.push([Markup.button.callback(`✅ Claim ${task.title}`, `claim_task_${task.id}`)]);
+    }
+  });
+
+  buttons.push([Markup.button.callback('🔙 Back', 'tasks_menu')]);
+
+  await ctx.editMessageText(text, {
+    parse_mode: 'HTML',
+    reply_markup: Markup.inlineKeyboard(buttons).reply_markup,
+  });
+}
+
+async function handleClaimTask(ctx) {
+  const taskId = ctx.match[1];
+  const userId = ctx.from.id;
+
+  const result = await claimTask(userId, taskId);
+  if (result.success) {
+    await ctx.answerCbQuery(`✅ +${result.reward} coins!`, { show_alert: true });
+    await handleListTasks(ctx); // refresh
+  } else {
+    await ctx.answerCbQuery(result.message, { show_alert: true });
+  }
+}
+
+async function handleReferralMenu(ctx) {
+  const userId = ctx.from.id;
+  const count = await getReferralCount(userId);
+  const link = generateReferralLink(userId);
+
+  const text = `👥 <b>Referral Program</b>\n\n` +
+    `Invite friends and earn <b>${config.settings.referralBonus}</b> coins per referral!\n\n` +
+    `Your referrals: <b>${count}</b>\n\n` +
+    `Your link:\n<code>${link}</code>`;
+
+  await ctx.editMessageText(text, { parse_mode: 'HTML', ...referralKeyboard });
+}
+
+async function handleWalletMenu(ctx) {
+  const userId = ctx.from.id;
+  const balance = await getBalance(userId);
+
+  const text = `👛 <b>Your Wallet</b>\n\n` +
+    `💰 Current Balance: <b>${formatNumber(balance.coins)}</b> coins\n` +
+    `📈 Total Earned: <b>${formatNumber(balance.totalEarned)}</b> coins\n` +
+    `👥 Referral Earnings: <b>${formatNumber(balance.referralEarnings)}</b> coins`;
+
+  await ctx.editMessageText(text, { parse_mode: 'HTML', ...walletKeyboard });
+}
+
+async function handleWithdrawMenu(ctx) {
+  const userId = ctx.from.id;
+  const balance = await getBalance(userId);
+
+  const text = `💸 <b>Withdraw</b>\n\n` +
+    `Current Balance: <b>${formatNumber(balance.coins)}</b>\n` +
+    `Minimum Withdraw: <b>${config.settings.minWithdraw}</b> coins\n\n` +
+    `Withdrawals are reviewed by admins within 24-48 hours.`;
+
+  await ctx.editMessageText(text, { parse_mode: 'HTML', ...withdrawKeyboard });
+}
+
+async function handleRequestWithdraw(ctx) {
+  // Ask for amount via next message or use scene, but for simplicity use callback with prompt or fake for now
+  // Better: use a follow up message asking amount
+  await ctx.reply('💸 Enter the amount you want to withdraw (in coins):');
+
+  // We can use a simple state or ctx.session, but Telegraf needs session middleware for that.
+  // For clean impl, we'll add simple text handler later. For now demo prompt.
+  ctx.session = ctx.session || {};
+  ctx.session.awaitingWithdraw = true;
+}
+
+async function handleMyWithdraws(ctx) {
+  const userId = ctx.from.id;
+  const requests = await getUserWithdraws(userId);
+
+  if (!requests.length) {
+    return ctx.editMessageText('📜 No withdraw requests yet.', { parse_mode: 'HTML', ...backKeyboard });
+  }
+
+  let text = '📜 <b>Your Withdraw History</b>\n\n';
+  requests.slice(0, 8).forEach(r => {
+    const date = new Date(r.requestedAt).toLocaleDateString();
+    text += `• ${r.amount} coins - ${r.status.toUpperCase()} (${date})\n`;
+  });
+
+  await ctx.editMessageText(text, { parse_mode: 'HTML', ...backKeyboard });
+}
+
+async function handleLeaderboard(ctx) {
+  const { getLeaderboard } = require('../database/services/balanceService');
+  const top = await getLeaderboard(10);
+
+  let text = '🏆 <b>Top Earners Leaderboard</b>\n\n';
+  let rank = 1;
+
+  for (const entry of top) {
+    // Note: In real, fetch username from users db if want prettier
+    text += `${rank}. User ${entry.userId}: <b>${formatNumber(entry.totalEarned)}</b> coins\n`;
+    rank++;
+  }
+
+  await ctx.editMessageText(text, { parse_mode: 'HTML', ...backKeyboard });
+}
+
+async function handleVIPMenu(ctx) {
+  const userId = ctx.from.id;
+  // Fetch user status
+  const { getUser } = require('../database/services/userService');
+  const user = await getUser(userId);
+  const isVIP = user && user.isVIP && (!user.vipUntil || user.vipUntil > Date.now());
+
+  let text = `💎 <b>VIP Membership</b>\n\n`;
+  text += isVIP ? `✅ You are VIP until ${new Date(user.vipUntil).toLocaleDateString()}\n\n` : '';
+  text += `Price: <b>${config.settings.vipPrice}</b> coins\n\n` +
+    `Benefits:\n• 2x Daily Bonus\n• No spin cooldown\n• Priority withdrawals\n• Exclusive tasks`;
+
+  await ctx.editMessageText(text, { parse_mode: 'HTML', ...vipKeyboard });
+}
+
+async function handleBuyVIP(ctx) {
+  const userId = ctx.from.id;
+  const { getUser, setVIP } = require('../database/services/userService');
+  const { removeCoins, getBalance } = require('../database/services/balanceService');
+
+  const balance = await getBalance(userId);
+  if (balance.coins < config.settings.vipPrice) {
+    return ctx.answerCbQuery(`Not enough coins. Need ${config.settings.vipPrice}`, { show_alert: true });
+  }
+
+  await removeCoins(userId, config.settings.vipPrice);
+  await setVIP(userId, 1);
+
+  await ctx.answerCbQuery('🎉 VIP Activated for 30 days!', { show_alert: true });
+  await handleVIPMenu(ctx);
+}
+
+async function handleSettings(ctx) {
+  const text = `⚙️ <b>Settings</b>\n\n` +
+    `• Notifications: On\n` +
+    `• Language: English\n\n` +
+    `More settings coming soon.`;
+
+  await ctx.editMessageText(text, { parse_mode: 'HTML', ...backKeyboard });
+}
+
+async function handleSupport(ctx) {
+  const text = `📞 <b>Support</b>\n\n` +
+    `For help, contact: @youradminusername\n\n` +
+    `Or join our support group.`;
+
+  await ctx.editMessageText(text, { parse_mode: 'HTML', ...backKeyboard });
+}
+
+// Main callback query router
+async function handleCallbackQuery(ctx) {
+  const data = ctx.callbackQuery.data;
+
+  try {
+    if (data === 'main_menu') await showMainMenu(ctx);
+    else if (data === 'earn_menu') await handleEarnMenu(ctx);
+    else if (data === 'daily_bonus') await handleDailyBonus(ctx);
+    else if (data === 'spin_wheel') await handleSpinWheel(ctx);
+    else if (data === 'spin_action') await handleSpinAction(ctx);
+    else if (data === 'watch_ads') await handleWatchAds(ctx);
+    else if (data === 'tasks_menu') await handleTasksMenu(ctx);
+    else if (data === 'list_tasks') await handleListTasks(ctx);
+    else if (data.startsWith('claim_task_')) {
+      ctx.match = [data, data.replace('claim_task_', '')];
+      await handleClaimTask(ctx);
+    }
+    else if (data === 'referral_menu') await handleReferralMenu(ctx);
+    else if (data === 'wallet_menu') await handleWalletMenu(ctx);
+    else if (data === 'withdraw_menu') await handleWithdrawMenu(ctx);
+    else if (data === 'request_withdraw') await handleRequestWithdraw(ctx);
+    else if (data === 'my_withdraws' || data === 'withdraw_history') await handleMyWithdraws(ctx);
+    else if (data === 'leaderboard') await handleLeaderboard(ctx);
+    else if (data === 'vip_menu') await handleVIPMenu(ctx);
+    else if (data === 'buy_vip') await handleBuyVIP(ctx);
+    else if (data === 'vip_benefits') await handleVIPMenu(ctx);
+    else if (data === 'settings_menu') await handleSettings(ctx);
+    else if (data === 'support') await handleSupport(ctx);
+    else if (data === 'verify_channel') await require('./startHandler').handleVerifyChannel(ctx);
+    else if (data === 'share_referral') {
+      const link = generateReferralLink(ctx.from.id);
+      await ctx.reply(`📤 Share this link with your friends:\n\n<code>${link}</code>\n\nYou earn ${config.settings.referralBonus} coins per successful referral!`, backKeyboard);
+    }
+    else if (data === 'my_referrals') {
+      const count = await getReferralCount(ctx.from.id);
+      await ctx.reply(`👥 You have referred <b>${count}</b> users so far.`, { parse_mode: 'HTML', ...backKeyboard });
+    }
+
+    await ctx.answerCbQuery().catch(() => {});
+  } catch (err) {
+    console.error('Callback error:', err);
+    await ctx.answerCbQuery('An error occurred. Please try again.', { show_alert: true });
+  }
+}
+
+module.exports = {
+  showMainMenu,
+  handleCallbackQuery,
+  // Export individual if needed
+  handleRequestWithdraw,
+};
