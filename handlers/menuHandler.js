@@ -352,6 +352,11 @@ async function handleCallbackQuery(ctx) {
       const count = await getReferralCount(ctx.from.id);
       await ctx.reply(`👥 You have referred <b>${count}</b> users so far.`, { parse_mode: 'HTML', ...backKeyboard });
     }
+    else if (data === 'enter_verification_code') {
+      ctx.session = ctx.session || {};
+      ctx.session.awaitingVerificationCode = true;
+      await ctx.reply('🔑 আপনার Verification Code টি এখন টাইপ করে পাঠান:');
+    }
 
     await ctx.answerCbQuery().catch(() => {});
   } catch (err) {

@@ -227,13 +227,13 @@ bot.on('text', async (ctx) => {
     // Success - Give reward
     verification.used = true;
     const { addCoins } = require('./database/services/balanceService');
-    await addCoins(userId, 20, 'ads'); // 20 coins per verified ad
+    await addCoins(userId, 10, 'ads');
     const newCount = await incrementAdWatchCount(userId);
     const remaining = Math.max(0, MAX_AD_WATCHES - newCount);
 
     return ctx.replyWithHTML(
       `✅ <b>Verification Successful!</b>\n\n` +
-      `+20 coins যোগ হয়েছে আপনার অ্যাকাউন্টে।\n\n` +
+      `+10 coins যোগ হয়েছে আপনার অ্যাকাউন্টে।\n\n` +
       `📊 বাকি: <b>${remaining}/${MAX_AD_WATCHES}</b> টি অ্যাড\n\n` +
       `আবার অ্যাড দেখতে চাইলে মেনু থেকে আসুন।`
     );
@@ -277,13 +277,6 @@ bot.action(/^reject_wd_(.+)$/, async (ctx) => {
   await ctx.answerCbQuery('❌ Rejected & refunded');
   ctx.callbackQuery.data = 'admin_withdraws';
   await handleAdminCallback(ctx);
-});
-
-// Start entering verification code
-bot.action('enter_verification_code', async (ctx) => {
-  ctx.session = ctx.session || {};
-  ctx.session.awaitingVerificationCode = true;
-  await ctx.reply('🔑 আপনার Verification Code টি এখন টাইপ করে পাঠান:');
 });
 
 // ==================== RENDER READY WEBHOOK SETUP ====================
