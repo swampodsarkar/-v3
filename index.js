@@ -26,7 +26,7 @@ function generateVerificationCode() {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
 
-// Ad Watch Page - opens ad + auto-opens code popup after 30s
+// Ad Watch Page - opens ad popup, auto-closes after 30s, shows code
 app.get('/watch-ad/:userId', async (req, res) => {
   const userId = req.params.userId;
   const { getAdWatchCount } = require('./database/services/userService');
@@ -68,8 +68,10 @@ app.get('/watch-ad/:userId', async (req, res) => {
         .btn { display: inline-block; background: #0088cc; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 8px; cursor: pointer; margin-top: 15px; text-decoration: none; }
         .btn:hover { background: #006699; }
         .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .timer { font-size: 48px; font-weight: bold; color: #0088cc; margin: 20px 0; }
+        .code { font-size: 28px; font-weight: bold; color: #0088cc; letter-spacing: 3px; margin: 15px 0; padding: 10px; background: #f0f8ff; border-radius: 8px; }
         .warning { color: #d32f2f; font-size: 14px; margin-top: 15px; }
-        .success { color: #2e7d32; font-size: 16px; margin-top: 15px; }
+        .hidden { display: none; }
         .remaining { color: #666; font-size: 14px; }
       </style>
     </head>
@@ -77,113 +79,77 @@ app.get('/watch-ad/:userId', async (req, res) => {
       <div class="container">
         <h2>📺 Watch Ad & Earn</h2>
         <p class="remaining">বাকি: <b>${remaining}/${MAX_AD_WATCHES}</b></p>
-        <p>নিচের বাটনে ক্লিক করুন। ৩০ সেকেন্ড পর <b>অটোমেটিক一个新 ট্যাবে</b> আপনার কোড আসবে।</p>
+        <p>নিচের বাটনে ক্লিক করলে অ্যাড ওপেন হবে। <b>৩০ সেকেন্ড</b> পর অটো বন্ধ হয়ে কোড দেখাবে।</p>
 
-        <button class="btn" id="watchBtn" onclick="startAd()">▶️ Watch Ad Now</button>
-        <p id="statusText">বাটনে ক্লিক করে শুরু করুন</p>
-
-        <p class="success" id="doneMsg" style="display:none">✅ অ্যাড চলছে! ৩০ সেকেন্ড পর কোড পপআপ ওপেন হবে।</p>
-
-        <p class="warning">⚠️ মিথ্যা ক্লিক করলে কয়েন পাবেন না এবং অ্যাকাউন্ট সাসপেন্ড হতে পারে।</p>
-        <p class="warning">⚠️ পপআপ ব্লকার বন্ধ রাখুন (Allow popups)।</p>
-      </div>
-
-      <script>
-        function startAd() {
-          document.getElementById('watchBtn').disabled = true;
-          document.getElementById('watchBtn').textContent = '✅ Started';
-          document.getElementById('statusText').textContent = 'অ্যাড ওপেন হচ্ছে...';
-          document.getElementById('doneMsg').style.display = 'block';
-
-          // Open Monetag ad in new tab
-          window.open('https://omg10.com/4/11060583', '_blank');
-
-          // Open code popup (will show code after 30s)
-          // Browser allows this since it's in the same click event
-          window.open('/code-popup/${userId}', 'codePopup', 'width=450,height=380,scrollbars=no');
-        }
-      </script>
-    </body>
-    </html>
-  `);
-});
-
-// Auto Code Popup - opens as a new tab, shows code after 30s automatically
-app.get('/code-popup/:userId', async (req, res) => {
-  const userId = req.params.userId;
-  const { getAdWatchCount } = require('./database/services/userService');
-  const count = await getAdWatchCount(userId);
-  const remaining = Math.max(0, MAX_AD_WATCHES - count);
-
-  if (remaining <= 0) {
-    return res.send('<script>window.close()</script>');
-  }
-
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Verification Code</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f4; }
-        .container { max-width: 380px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .timer { font-size: 42px; font-weight: bold; color: #0088cc; margin: 15px 0; }
-        .code { font-size: 28px; font-weight: bold; color: #0088cc; letter-spacing: 3px; margin: 15px 0; padding: 10px; background: #f0f8ff; border-radius: 8px; }
-        .btn { display: inline-block; background: #0088cc; color: white; border: none; padding: 12px 25px; font-size: 16px; border-radius: 8px; cursor: pointer; text-decoration: none; }
-        .btn:hover { background: #006699; }
-        .hidden { display: none; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h3>⏳ Ad Watching...</h3>
-        <p>অনুগ্রহ করে অপেক্ষা করুন...</p>
-        <div id="timerContainer">
-          <div class="timer" id="timerDisplay">30</div>
-          <p id="waitText">অ্যাড শেষ হতে <span id="secDisplay">30</span> সেকেন্ড বাকি</p>
+        <div id="step1">
+          <button class="btn" id="watchBtn" onclick="startAd()">▶️ Watch Ad Now</button>
+          <p id="statusText">বাটনে ক্লিক করে শুরু করুন</p>
         </div>
-        <div id="codeContainer" class="hidden">
-          <p>✅ আপনার Verification Code:</p>
+
+        <div id="step2" class="hidden">
+          <p>✅ অ্যাড দেখা শেষ! আপনার Verification Code:</p>
           <div class="code" id="codeDisplay">------</div>
-          <p>কোডটি কপি করে বটে পাঠান</p>
+          <p>কোডটি কপি করে বটে পাঠান 🎯</p>
           <button class="btn" onclick="copyCode()">📋 Copy Code</button>
           <p style="margin-top:10px"><a class="btn" href="https://t.me/${config.botUsername.replace('@', '')}">Back to Bot</a></p>
         </div>
+
+        <div id="timerArea" class="hidden">
+          <div class="timer" id="timerDisplay">30</div>
+          <p id="timerText">অটো বন্ধ হতে <span id="secDisplay">30</span> সেকেন্ড বাকি</p>
+        </div>
+
+        <p class="warning">⚠️ মিথ্যা ক্লিক করলে কয়েন পাবেন না এবং অ্যাকাউন্ট সাসপেন্ড হতে পারে।</p>
       </div>
 
       <script>
+        let adPopup = null;
         let timer = 30;
+        let interval = null;
         let codeGenerated = false;
 
-        const interval = setInterval(() => {
-          timer--;
-          document.getElementById('timerDisplay').textContent = timer;
-          document.getElementById('secDisplay').textContent = timer;
+        function startAd() {
+          document.getElementById('watchBtn').disabled = true;
+          document.getElementById('watchBtn').textContent = '⏳ Opening...';
+          document.getElementById('statusText').textContent = 'অ্যাড ওপেন হচ্ছে...';
+          document.getElementById('step1').classList.add('hidden');
+          document.getElementById('timerArea').classList.remove('hidden');
 
-          if (timer <= 0) {
-            clearInterval(interval);
-            if (!codeGenerated) generateCode();
-          }
-        }, 1000);
+          // Open Monetag ad as a tracked popup
+          adPopup = window.open('https://omg10.com/4/11060583', 'monetagAd', 'width=400,height=600');
+
+          interval = setInterval(() => {
+            timer--;
+            document.getElementById('timerDisplay').textContent = timer;
+            document.getElementById('secDisplay').textContent = timer;
+
+            if (timer <= 0) {
+              clearInterval(interval);
+              if (!codeGenerated) generateCode();
+            }
+          }, 1000);
+        }
 
         async function generateCode() {
           codeGenerated = true;
-          document.getElementById('waitText').textContent = '✅ কোড জেনারেট হচ্ছে...';
+          document.getElementById('timerText').textContent = '✅ কোড জেনারেট হচ্ছে...';
+
+          // Close the ad popup
+          try { if (adPopup && !adPopup.closed) adPopup.close(); } catch(e) {}
 
           try {
             const response = await fetch('/api/generate-code/${userId}');
             const data = await response.json();
 
             if (data.success && data.code) {
-              document.getElementById('timerContainer').classList.add('hidden');
-              document.getElementById('codeContainer').classList.remove('hidden');
+              document.getElementById('timerArea').classList.add('hidden');
+              document.getElementById('step2').classList.remove('hidden');
               document.getElementById('codeDisplay').textContent = data.code;
             } else {
-              document.getElementById('waitText').textContent = '❌ ' + (data.message || 'Error');
+              document.getElementById('timerText').textContent = '❌ ' + (data.message || 'Error. Try again.');
             }
           } catch (err) {
-            document.getElementById('waitText').textContent = '❌ Error';
+            document.getElementById('timerText').textContent = '❌ Error. Try again.';
           }
         }
 
