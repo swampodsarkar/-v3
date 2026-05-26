@@ -125,8 +125,8 @@ async function handleWatchAds(ctx) {
   const text = 
     `📺 <b>Watch Ads & Earn</b>\n\n` +
     `📊 বাকি: <b>${remaining}/১০</b> টি অ্যাড\n\n` +
-    `1. "Watch Ad" বাটনে ক্লিক করুন\n` +
-    `2. ৩০ সেকেন্ড পর অটো ভেরিফিকেশন পেজে যাবে\n` +
+    `1. লিংকে ক্লিক করে অ্যাড ওপেন করুন\n` +
+    `2. ৩০ সেকেন্ড পর পেজ অটো রিডিরেক্ট হবে\n` +
     `3. কোড কপি করে বটে পাঠান\n\n` +
     `⚠️ অ্যাড না দেখলে কয়েন পাবেন না।`;
 
@@ -134,7 +134,7 @@ async function handleWatchAds(ctx) {
     parse_mode: 'HTML',
     reply_markup: {
       inline_keyboard: [
-        [{ text: "▶️ Watch Ad & Get Code", url: watchUrl }],
+        [{ text: "▶️ Open Ad Page", url: watchUrl }],
         [{ text: "✏️ Enter Verification Code", callback_data: "enter_verification_code" }],
         [{ text: "🔙 Back", callback_data: "earn_menu" }]
       ]

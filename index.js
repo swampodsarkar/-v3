@@ -26,7 +26,7 @@ function generateVerificationCode() {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
 
-// Ad Watch Page - opens ad, after 30s auto-redirects to verification page
+// Pure HTML: Ad page with meta refresh (no JS needed for redirect)
 app.get('/watch-ad/:userId', async (req, res) => {
   const userId = req.params.userId;
   const { getAdWatchCount } = require('./database/services/userService');
@@ -48,7 +48,6 @@ app.get('/watch-ad/:userId', async (req, res) => {
         <div class="container">
           <h2>❌ Limit Reached</h2>
           <p>আপনি সর্বোচ্চ <b>${MAX_AD_WATCHES} বার</b> অ্যাড দেখেছেন।</p>
-          <p>অন্য কাজ দেখে কয়েন আয় করুন।</p>
           <p><a href="https://t.me/${config.botUsername.replace('@', '')}">Back to Bot</a></p>
         </div>
       </body>
@@ -60,15 +59,14 @@ app.get('/watch-ad/:userId', async (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Watch Ad & Earn</title>
+      <title>Watch Ad</title>
       <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta http-equiv="refresh" content="30;url=/verify-tab/${userId}">
       <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 40px 20px; background: #f4f4f4; }
         .container { max-width: 420px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .btn { display: inline-block; background: #0088cc; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 8px; cursor: pointer; margin-top: 15px; text-decoration: none; }
+        .btn { display: inline-block; background: #0088cc; color: white; padding: 15px 30px; font-size: 18px; border-radius: 8px; text-decoration: none; margin-top: 15px; }
         .btn:hover { background: #006699; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; }
-        .timer { font-size: 48px; font-weight: bold; color: #0088cc; margin: 20px 0; }
         .warning { color: #d32f2f; font-size: 14px; margin-top: 15px; }
         .remaining { color: #666; font-size: 14px; }
       </style>
@@ -77,47 +75,14 @@ app.get('/watch-ad/:userId', async (req, res) => {
       <div class="container">
         <h2>📺 Watch Ad & Earn</h2>
         <p class="remaining">বাকি: <b>${remaining}/${MAX_AD_WATCHES}</b></p>
-        <p>নিচের বাটনে ক্লিক করলে অ্যাড ওপেন হবে। <b>৩০ সেকেন্ড</b> পর অটো ভেরিফিকেশন পেজে চলে যাবে।</p>
+        <p>নিচের লিংকে ক্লিক করে অ্যাড দেখুন।<br><b>৩০ সেকেন্ড</b> পর অটো ভেরিফিকেশন পেজে চলে যাবে।</p>
 
-        <div id="step1">
-          <button class="btn" id="watchBtn" onclick="startAd()">▶️ Watch Ad Now</button>
-          <p id="statusText">বাটনে ক্লিক করে শুরু করুন</p>
-        </div>
+        <a class="btn" href="https://omg10.com/4/11060583" target="_blank">▶️ Open Ad</a>
 
-        <div id="timerArea" class="hidden">
-          <div class="timer" id="timerDisplay">30</div>
-          <p>অপেক্ষা করুন <span id="secDisplay">30</span> সেকেন্ড...</p>
-          <p id="redirectMsg" class="hidden" style="color:#2e7d32;font-weight:bold">⏳ রিডিরেক্ট হচ্ছে...</p>
-        </div>
+        <p style="margin-top:20px;color:#666">⏳ 30 সেকেন্ড পর অটো রিডিরেক্ট হবে...</p>
 
         <p class="warning">⚠️ মিথ্যা ক্লিক করলে কয়েন পাবেন না এবং অ্যাকাউন্ট সাসপেন্ড হতে পারে।</p>
       </div>
-
-      <script>
-        function startAd() {
-          document.getElementById('watchBtn').disabled = true;
-          document.getElementById('watchBtn').textContent = '✅ Started';
-          document.getElementById('statusText').textContent = 'অ্যাড ওপেন হচ্ছে...';
-          document.getElementById('step1').classList.add('hidden');
-          document.getElementById('timerArea').classList.remove('hidden');
-
-          window.open('https://omg10.com/4/11060583', '_blank');
-
-          let timer = 30;
-          const interval = setInterval(() => {
-            timer--;
-            document.getElementById('timerDisplay').textContent = timer;
-            document.getElementById('secDisplay').textContent = timer;
-
-            if (timer <= 0) {
-              clearInterval(interval);
-              document.getElementById('redirectMsg').classList.remove('hidden');
-              // Redirect to verification page
-              window.location.href = '/verify-tab/${userId}';
-            }
-          }, 1000);
-        }
-      </script>
     </body>
     </html>
   `);
