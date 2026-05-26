@@ -19,220 +19,7 @@ const app = express();
 bot.use(session());
 
 // ==================== VERIFICATION CODE SYSTEM (Anti-Cheat) ====================
-const pendingVerifications = new Map(); // userId -> { code, expiresAt, used: false }
-const MAX_AD_WATCHES = 10;
-
-function generateVerificationCode() {
-  return Math.random().toString(36).substring(2, 10).toUpperCase();
-}
-
-// Pure HTML: Ad page with meta refresh (no JS needed for redirect)
-app.get('/watch-ad/:userId', async (req, res) => {
-  const userId = req.params.userId;
-  const { getAdWatchCount } = require('./database/services/userService');
-  const count = await getAdWatchCount(userId);
-  const remaining = Math.max(0, MAX_AD_WATCHES - count);
-
-  if (remaining <= 0) {
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head><title>Limit Reached</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px 20px; background: #f4f4f4; }
-        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-      </style>
-      </head>
-      <body>
-        <div class="container">
-          <h2>❌ Limit Reached</h2>
-          <p>আপনি সর্বোচ্চ <b>${MAX_AD_WATCHES} বার</b> অ্যাড দেখেছেন।</p>
-          <p><a href="https://t.me/${config.botUsername.replace('@', '')}">Back to Bot</a></p>
-        </div>
-      </body>
-      </html>
-    `);
-  }
-
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Watch Ad</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <meta http-equiv="refresh" content="30;url=/verify-tab/${userId}">
-      <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 40px 20px; background: #f4f4f4; }
-        .container { max-width: 420px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .btn { display: inline-block; background: #0088cc; color: white; padding: 15px 30px; font-size: 18px; border-radius: 8px; text-decoration: none; margin-top: 15px; }
-        .btn:hover { background: #006699; }
-        .warning { color: #d32f2f; font-size: 14px; margin-top: 15px; }
-        .remaining { color: #666; font-size: 14px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h2>📺 Watch Ad & Earn</h2>
-        <p class="remaining">বাকি: <b>${remaining}/${MAX_AD_WATCHES}</b></p>
-        <p>নিচের লিংকে ক্লিক করে অ্যাড দেখুন।<br><b>৩০ সেকেন্ড</b> পর অটো ভেরিফিকেশন পেজে চলে যাবে।</p>
-
-        <a class="btn" href="https://omg10.com/4/11060583" target="_blank">▶️ Open Ad</a>
-
-        <p style="margin-top:20px;color:#666">⏳ 30 সেকেন্ড পর অটো রিডিরেক্ট হবে...</p>
-
-        <p class="warning">⚠️ মিথ্যা ক্লিক করলে কয়েন পাবেন না এবং অ্যাকাউন্ট সাসপেন্ড হতে পারে।</p>
-      </div>
-    </body>
-    </html>
-  `);
-});
-
-// Verification Page - auto-generates code on load and shows it
-app.get('/verify-tab/:userId', async (req, res) => {
-  const userId = req.params.userId;
-  const { getAdWatchCount } = require('./database/services/userService');
-  const count = await getAdWatchCount(userId);
-  const remaining = Math.max(0, MAX_AD_WATCHES - count);
-
-  if (remaining <= 0) {
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head><title>Limit Reached</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px 20px; background: #f4f4f4; }
-        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-      </style>
-      </head>
-      <body>
-        <div class="container">
-          <h2>❌ Limit Reached</h2>
-          <p>আপনি সর্বোচ্চ <b>${MAX_AD_WATCHES} বার</b> অ্যাড দেখেছেন।</p>
-          <p><a href="https://t.me/${config.botUsername.replace('@', '')}">Back to Bot</a></p>
-        </div>
-      </body>
-      </html>
-    `);
-  }
-
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Verification Code</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 30px 20px; background: #f4f4f4; }
-        .container { max-width: 400px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .code { font-size: 28px; font-weight: bold; color: #0088cc; letter-spacing: 3px; margin: 15px 0; padding: 10px; background: #f0f8ff; border-radius: 8px; }
-        .btn { display: inline-block; background: #0088cc; color: white; border: none; padding: 12px 25px; font-size: 16px; border-radius: 8px; cursor: pointer; text-decoration: none; }
-        .btn:hover { background: #006699; }
-        .hidden { display: none; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h3>✅ Verification Code</h3>
-        <div id="loadingArea">
-          <p>⏳ কোড জেনারেট হচ্ছে...</p>
-        </div>
-        <div id="codeArea" class="hidden">
-          <p>✅ আপনার Verification Code:</p>
-          <div class="code" id="codeDisplay">------</div>
-          <p>কোডটি কপি করে বটে পাঠান</p>
-          <button class="btn" onclick="copyCode()">📋 Copy Code</button>
-          <p style="margin-top:10px"><a class="btn" href="https://t.me/${config.botUsername.replace('@', '')}">Back to Bot</a></p>
-        </div>
-        <div id="errorArea" class="hidden">
-          <p id="errorMsg" style="color:#d32f2f">❌ Error</p>
-        </div>
-      </div>
-
-      <script>
-        (async function() {
-          try {
-            const response = await fetch('/api/generate-code/${userId}');
-            const data = await response.json();
-
-            if (data.success && data.code) {
-              document.getElementById('loadingArea').classList.add('hidden');
-              document.getElementById('codeArea').classList.remove('hidden');
-              document.getElementById('codeDisplay').textContent = data.code;
-            } else {
-              document.getElementById('loadingArea').classList.add('hidden');
-              document.getElementById('errorArea').classList.remove('hidden');
-              document.getElementById('errorMsg').textContent = '❌ ' + (data.message || 'Error');
-            }
-          } catch (err) {
-            document.getElementById('loadingArea').classList.add('hidden');
-            document.getElementById('errorArea').classList.remove('hidden');
-            document.getElementById('errorMsg').textContent = '❌ Network error. Try again.';
-          }
-        })();
-
-        function copyCode() {
-          const code = document.getElementById('codeDisplay').textContent;
-          navigator.clipboard.writeText(code).then(() => {
-            alert('✅ Code copied!');
-          }).catch(() => {
-            alert('Code: ' + code);
-          });
-        }
-      </script>
-    </body>
-    </html>
-  `);
-});
-
-// Handle verification and generate code (legacy POST method)
-app.post('/verify/:userId', express.urlencoded({ extended: true }), async (req, res) => {
-  const userId = req.params.userId;
-  const code = generateVerificationCode();
-  const expiresAt = Date.now() + (10 * 60 * 1000); // 10 minutes expiry
-
-  pendingVerifications.set(userId, {
-    code,
-    expiresAt,
-    used: false
-  });
-
-  res.send(`
-    <html>
-    <head><title>Verification Code</title></head>
-    <body style="font-family: Arial; text-align: center; padding: 50px;">
-      <h2>🎉 Verification Successful!</h2>
-      <p>আপনার Verification Code:</p>
-      <h1 style="color: #0088cc; font-size: 32px; letter-spacing: 3px;">${code}</h1>
-      <p>এই কোডটি <strong>১০ মিনিটের</strong> মধ্যে বটে পাঠিয়ে দিন।</p>
-      <p><strong>বটে ফিরে গিয়ে কোডটি টাইপ করুন।</strong></p>
-    </body>
-    </html>
-  `);
-});
-
-// API: Generate verification code (for /watch-ad page)
-app.get('/api/generate-code/:userId', async (req, res) => {
-  const userId = req.params.userId;
-  const { getAdWatchCount } = require('./database/services/userService');
-  const count = await getAdWatchCount(userId);
-
-  if (count >= MAX_AD_WATCHES) {
-    return res.json({ success: false, message: 'Limit reached' });
-  }
-
-  const code = generateVerificationCode();
-  const expiresAt = Date.now() + (10 * 60 * 1000);
-
-  pendingVerifications.set(userId, {
-    code,
-    expiresAt,
-    used: false
-  });
-
-  res.json({ success: true, code });
-});
+const { pendingVerifications, MAX_AD_WATCHES, createVerification, getVerification, deleteVerification } = require('./utils/verification');
 
 // ==================== END VERIFICATION SYSTEM ====================
 
@@ -329,7 +116,7 @@ bot.on('text', async (ctx) => {
     const userId = ctx.from.id;
     const enteredCode = text.trim().toUpperCase();
 
-    const verification = pendingVerifications.get(userId);
+    const verification = getVerification(userId);
 
     if (!verification) {
       return ctx.reply('❌ কোনো Verification Code পাওয়া যায়নি। আবার "Get Verification Code" চাপুন।');
@@ -340,8 +127,8 @@ bot.on('text', async (ctx) => {
     }
 
     if (Date.now() > verification.expiresAt) {
-      pendingVerifications.delete(userId);
-      return ctx.reply('❌ Verification Code এর মেয়াদ শেষ হয়ে গেছে। আবার চেষ্টা করুন।');
+      deleteVerification(userId);
+      return ctx.reply('❌ Verification Code এর মেয়াদ শেষ হয়ে গেছে। আবার চেষ্টা করুন۔');
     }
 
     if (enteredCode !== verification.code) {
@@ -353,7 +140,7 @@ bot.on('text', async (ctx) => {
     const watchCount = await getAdWatchCount(userId);
 
     if (watchCount >= MAX_AD_WATCHES) {
-      pendingVerifications.delete(userId);
+      deleteVerification(userId);
       return ctx.reply(`❌ আপনি সর্বোচ্চ ${MAX_AD_WATCHES} বার অ্যাড দেখেছেন।`);
     }
 
