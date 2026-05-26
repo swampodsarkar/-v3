@@ -335,6 +335,58 @@ async function handleFaucet(ctx) {
   }
 }
 
+async function handleMiningMenu(ctx) {
+  const userId = ctx.from.id;
+  const { getMining, claimMining, MIN_INVEST, PROFIT_PERCENT } = require('../database/services/miningService');
+  const { getBalance } = require('../database/services/balanceService');
+  const bal = await getBalance(userId);
+  const active = await getMining(userId);
+
+  let text = `⛏️ <b>Mining</b>\n\n`;
+  text += `💰 Balance: <b>${bal.coins}</b> coins\n\n`;
+
+  if (active && !active.claimed) {
+    const elapsed = Date.now() - active.startedAt;
+    if (elapsed >= 24 * 60 * 60 * 1000) {
+      text += `✅ Mining complete! Claim your reward.`;
+      const buttons = [[Markup.button.callback('🎁 Claim Reward', 'mining_claim')], [Markup.button.callback('🔙 Back', 'main_menu')]];
+      return ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: Markup.inlineKeyboard(buttons).reply_markup });
+    }
+    const left = 24 * 60 * 60 * 1000 - elapsed;
+    const h = Math.floor(left / 3600000);
+    const m = Math.floor((left % 3600000) / 60000);
+    text += `⏳ Mining in progress...\n`;
+    text += `Invested: <b>${active.invested}</b> coins\n`;
+    text += `Profit: <b>+${Math.floor(active.invested * PROFIT_PERCENT)}</b> coins (15%)\n`;
+    text += `Time left: <b>${h}h ${m}m</b>`;
+  } else {
+    text += `⛏️ Invest coins and earn <b>15% profit</b> in 24h!\n\n`;
+    text += `Minimum invest: <b>${MIN_INVEST}</b> coins\n`;
+    text += `Example: Invest 100 → Get 115 after 24h\n\n`;
+    text += `কত coins invest করতে চান? টাইপ করে পাঠান।`;
+  }
+
+  const buttons = active && !active.claimed
+    ? [[Markup.button.callback('🔙 Back', 'main_menu')]]
+    : [[Markup.button.callback('🔙 Back', 'main_menu')]];
+
+  await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: Markup.inlineKeyboard(buttons).reply_markup });
+  ctx.session = ctx.session || {};
+  ctx.session.awaitingMiningAmount = !active || active.claimed;
+}
+
+async function handleMiningClaim(ctx) {
+  const userId = ctx.from.id;
+  const { claimMining } = require('../database/services/miningService');
+  const result = await claimMining(userId);
+  if (result.success) {
+    await ctx.answerCbQuery(`⛏️ +${result.total} coins!`, { show_alert: true });
+  } else {
+    await ctx.answerCbQuery(result.message, { show_alert: true });
+  }
+  await handleMiningMenu(ctx);
+}
+
 // Main callback query router
 async function handleCallbackQuery(ctx) {
   const data = ctx.callbackQuery.data;
@@ -364,6 +416,8 @@ async function handleCallbackQuery(ctx) {
     else if (data === 'settings_menu') await handleSettings(ctx);
     else if (data === 'support') await handleSupport(ctx);
     else if (data === 'faucet_claim') await handleFaucet(ctx);
+    else if (data === 'mining_menu') await handleMiningMenu(ctx);
+    else if (data === 'mining_claim') await handleMiningClaim(ctx);
     else if (data === 'verify_channel') await require('./startHandler').handleVerifyChannel(ctx);
     else if (data === 'share_referral') {
       const link = generateReferralLink(ctx.from.id);

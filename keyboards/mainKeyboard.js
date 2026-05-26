@@ -10,11 +10,14 @@ const mainMenuKeyboard = Markup.inlineKeyboard([
     Markup.button.callback('🎡 Spin Wheel', 'spin_wheel'),
   ],
   [
+    Markup.button.callback('⛏️ Mining', 'mining_menu'),
     Markup.button.callback('📺 Watch Ads', 'watch_ads'),
-    Markup.button.callback('📋 Tasks', 'tasks_menu'),
   ],
   [
+    Markup.button.callback('📋 Tasks', 'tasks_menu'),
     Markup.button.callback('👥 Refer & Earn', 'referral_menu'),
+  ],
+  [
     Markup.button.callback('👛 Wallet', 'wallet_menu'),
   ],
   [
@@ -40,6 +43,7 @@ const earnMenuKeyboard = Markup.inlineKeyboard([
     Markup.button.callback('📺 Watch Ads', 'watch_ads'),
   ],
   [
+    Markup.button.callback('⛏️ Mining', 'mining_menu'),
     Markup.button.callback('📋 Tasks', 'tasks_menu'),
   ],
   [Markup.button.callback('🔙 Back to Home', 'main_menu')],

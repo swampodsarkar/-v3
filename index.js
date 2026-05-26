@@ -190,6 +190,21 @@ bot.on('text', async (ctx) => {
     return;
   }
 
+  // Mining amount input
+  if (sessionData.awaitingMiningAmount) {
+    ctx.session.awaitingMiningAmount = false;
+    const amount = parseInt(text);
+    const { MIN_INVEST } = require('./database/services/miningService');
+    if (isNaN(amount) || amount < MIN_INVEST) {
+      return ctx.reply(`❌ Minimum invest ${MIN_INVEST} coins. Enter a valid amount.`);
+    }
+    const { startMining } = require('./database/services/miningService');
+    const result = await startMining(ctx.from.id, amount);
+    return ctx.reply(result.success
+      ? `⛏️ Mining started! ${amount} coins invested. Come back after 24h to claim +${Math.floor(amount * 0.15)} profit.`
+      : `❌ ${result.message}`);
+  }
+
   // Verification Code Submission
   if (sessionData.awaitingVerificationCode) {
     ctx.session.awaitingVerificationCode = false;
